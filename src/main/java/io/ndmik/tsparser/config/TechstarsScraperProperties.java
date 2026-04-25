@@ -8,6 +8,8 @@ import java.time.Duration;
 public record TechstarsScraperProperties(
         String jobsUrl,
         Duration timeout,
-        String userAgent
+        String userAgent,
+        boolean schedulingEnabled,
+        String cron
 ) {
 }

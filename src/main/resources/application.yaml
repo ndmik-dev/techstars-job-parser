@@ -26,3 +26,5 @@ techstars:
     jobs-url: https://jobs.techstars.com/jobs
     timeout: 10s
     user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36
+    scheduling-enabled: false
+    cron: "0 0 */6 * * *"
