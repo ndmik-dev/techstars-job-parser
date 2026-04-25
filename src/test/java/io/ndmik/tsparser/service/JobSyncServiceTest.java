@@ -91,13 +91,42 @@ class JobSyncServiceTest {
         assertThat(deactivatedJob.isActive()).isFalse();
     }
 
-    private static ScrapedJob scrapedJob(
-            String externalId,
-            String title,
-            String companyName,
-            String location,
-            List<String> tags
-    ) {
+    @Test
+    void ignoresInvalidAndDuplicateScrapedJobs() {
+        JobSyncResult result = jobSyncService.sync(List.of(
+                scrapedJob("job-1", "Backend Engineer", "Acme", "Remote", List.of("Java")),
+                scrapedJob("job-1", "Backend Engineer Duplicate", "Acme", "Remote", List.of("Spring")),
+                scrapedJob("", "Missing External Id", "Acme", "Remote", List.of("Java")),
+                scrapedJob("job-2", "", "Acme", "Remote", List.of("Java")),
+                scrapedJob("job-3", "Missing Company", "", "Remote", List.of("Java"))
+        ));
+
+        assertThat(result.retrievedCount()).isEqualTo(1);
+        assertThat(result.createdCount()).isEqualTo(1);
+        assertThat(result.updatedCount()).isZero();
+        assertThat(jobRepository.findAll()).hasSize(1);
+
+        Job job = jobRepository.findByExternalId("job-1").orElseThrow();
+        assertThat(job.getTitle()).isEqualTo("Backend Engineer");
+        assertThat(job.getTags()).extracting("name").containsExactly("Java");
+    }
+
+    @Test
+    void doesNotDeactivateExistingJobsWhenScrapeResultIsEmpty() {
+        jobSyncService.sync(List.of(scrapedJob("job-1", "Backend Engineer", "Acme", "Remote", List.of("Java"))));
+
+        JobSyncResult result = jobSyncService.sync(List.of());
+
+        assertThat(result.retrievedCount()).isZero();
+        assertThat(result.deactivatedCount()).isZero();
+        assertThat(jobRepository.findByExternalId("job-1")).hasValueSatisfying(job -> assertThat(job.isActive()).isTrue());
+    }
+
+    private static ScrapedJob scrapedJob(String externalId,
+                                         String title,
+                                         String companyName,
+                                         String location,
+                                         List<String> tags) {
         return new ScrapedJob(
                 externalId,
                 title,

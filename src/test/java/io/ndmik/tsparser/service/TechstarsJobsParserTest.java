@@ -62,4 +62,21 @@ class TechstarsJobsParserTest {
 
         assertThat(parser.parse(html, "https://jobs.techstars.com/jobs")).isEmpty();
     }
+
+    @Test
+    void skipsCardsWithoutRequiredFields() {
+        String html = """
+                <div data-testid="job-list-item">
+                  <a href="" data-testid="job-title-link">Backend Engineer</a>
+                  <div itemprop="hiringOrganization">
+                    <a data-testid="link" href="/companies/acme#content">Acme</a>
+                  </div>
+                </div>
+                <div data-testid="job-list-item">
+                  <a href="/jobs/job-1" data-testid="job-title-link">Backend Engineer</a>
+                </div>
+                """;
+
+        assertThat(parser.parse(html, "https://jobs.techstars.com/jobs")).isEmpty();
+    }
 }

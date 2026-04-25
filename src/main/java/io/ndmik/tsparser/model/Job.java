@@ -89,7 +89,10 @@ public class Job {
     @Setter(AccessLevel.NONE)
     private Instant updatedAt;
 
-    public Job(String externalId, String title, String sourceUrl, Company company) {
+    public Job(String externalId,
+               String title,
+               String sourceUrl,
+               Company company) {
         this.externalId = externalId;
         this.title = title;
         this.sourceUrl = sourceUrl;

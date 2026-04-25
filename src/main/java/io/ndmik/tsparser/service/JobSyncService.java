@@ -11,10 +11,17 @@ import io.ndmik.tsparser.repository.JobRepository;
 import io.ndmik.tsparser.repository.ScrapeRunRepository;
 import io.ndmik.tsparser.repository.TagRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 @Service
@@ -24,63 +31,78 @@ public class JobSyncService {
     private final CompanyRepository companyRepository;
     private final TagRepository tagRepository;
     private final ScrapeRunRepository scrapeRunRepository;
+    private final TransactionTemplate transactionTemplate;
 
     public JobSyncService(JobRepository jobRepository,
                           CompanyRepository companyRepository,
                           TagRepository tagRepository,
-                          ScrapeRunRepository scrapeRunRepository) {
+                          ScrapeRunRepository scrapeRunRepository,
+                          TransactionTemplate transactionTemplate) {
         this.jobRepository = jobRepository;
         this.companyRepository = companyRepository;
         this.tagRepository = tagRepository;
         this.scrapeRunRepository = scrapeRunRepository;
+        this.transactionTemplate = transactionTemplate;
     }
 
-    @Transactional
     public JobSyncResult sync(Collection<ScrapedJob> scrapedJobs) {
         ScrapeRun scrapeRun = scrapeRunRepository.save(ScrapeRun.started());
+        List<ScrapedJob> validJobs = validUniqueJobs(scrapedJobs);
 
         try {
-            SyncCounters counters = new SyncCounters();
-            Set<String> seenExternalIds = new HashSet<>();
-
-            for (ScrapedJob scrapedJob : scrapedJobs) {
-                if (scrapedJob.externalId() == null || scrapedJob.externalId().isBlank()) {
-                    continue;
-                }
-
-                seenExternalIds.add(scrapedJob.externalId());
-                Company company = resolveCompany(scrapedJob);
-                Set<Tag> tags = resolveTags(scrapedJob.tags());
-                Job job = jobRepository.findByExternalId(scrapedJob.externalId())
-                        .orElseGet(() -> {
-                            counters.created++;
-                            return new Job(scrapedJob.externalId(), scrapedJob.title(), scrapedJob.sourceUrl(), company);
-                        });
-
-                if (job.getId() != null) {
-                    counters.updated++;
-                }
-
-                applyScrapedData(job, scrapedJob, company, tags);
-                jobRepository.save(job);
-            }
-
-            int deactivatedCount = deactivateMissingJobs(seenExternalIds);
-            scrapeRun.complete(seenExternalIds.size(), counters.created, counters.updated, deactivatedCount);
-            scrapeRunRepository.save(scrapeRun);
-
-            return new JobSyncResult(
-                    scrapeRun.getId(),
-                    seenExternalIds.size(),
-                    counters.created,
-                    counters.updated,
-                    deactivatedCount
-            );
+            return transactionTemplate.execute(_ -> syncJobs(scrapeRun, validJobs));
         } catch (RuntimeException exception) {
-            scrapeRun.fail(exception.getMessage());
-            scrapeRunRepository.save(scrapeRun);
+            markFailed(scrapeRun, exception);
             throw exception;
         }
+    }
+
+    private JobSyncResult syncJobs(ScrapeRun scrapeRun, List<ScrapedJob> scrapedJobs) {
+        SyncCounters counters = new SyncCounters();
+        Set<String> seenExternalIds = new HashSet<>();
+
+        for (ScrapedJob scrapedJob : scrapedJobs) {
+            seenExternalIds.add(scrapedJob.externalId());
+            syncJob(scrapedJob, counters);
+        }
+
+        int deactivatedCount = deactivateMissingJobs(seenExternalIds);
+        scrapeRun.complete(seenExternalIds.size(), counters.created, counters.updated, deactivatedCount);
+        scrapeRunRepository.save(scrapeRun);
+
+        return new JobSyncResult(
+                scrapeRun.getId(),
+                seenExternalIds.size(),
+                counters.created,
+                counters.updated,
+                deactivatedCount
+        );
+    }
+
+    private void syncJob(ScrapedJob scrapedJob, SyncCounters counters) {
+        Company company = resolveCompany(scrapedJob);
+        Set<Tag> tags = resolveTags(scrapedJob.tags());
+        Job job = findOrCreateJob(scrapedJob, company, counters);
+
+        applyScrapedData(job, scrapedJob, company, tags);
+        jobRepository.save(job);
+    }
+
+    private Job findOrCreateJob(ScrapedJob scrapedJob, Company company, SyncCounters counters) {
+        return jobRepository.findByExternalId(scrapedJob.externalId())
+                .map(existingJob -> {
+                    counters.updated++;
+                    return existingJob;
+                })
+                .orElseGet(() -> {
+                    counters.created++;
+                    return new Job(
+                            scrapedJob.externalId(),
+                            scrapedJob.title(),
+                            scrapedJob.sourceUrl(),
+                            company
+                    );
+                });
     }
 
     private Company resolveCompany(ScrapedJob scrapedJob) {
@@ -94,7 +116,7 @@ public class JobSyncService {
 
     private Set<Tag> resolveTags(List<String> tagNames) {
         Set<Tag> tags = new HashSet<>();
-        for (String tagName : tagNames) {
+        for (String tagName : nullSafeList(tagNames)) {
             if (tagName == null || tagName.isBlank()) {
                 continue;
             }
@@ -130,6 +152,47 @@ public class JobSyncService {
         }
         jobRepository.saveAll(missingJobs);
         return missingJobs.size();
+    }
+
+    private void markFailed(ScrapeRun scrapeRun, RuntimeException exception) {
+        transactionTemplate.executeWithoutResult(_ -> {
+            scrapeRun.fail(exception.getMessage());
+            scrapeRunRepository.save(scrapeRun);
+        });
+    }
+
+    private static List<ScrapedJob> validUniqueJobs(Collection<ScrapedJob> scrapedJobs) {
+        Map<String, ScrapedJob> jobsByExternalId = new LinkedHashMap<>();
+        for (ScrapedJob scrapedJob : nullSafeCollection(scrapedJobs)) {
+            if (isValid(scrapedJob)) {
+                jobsByExternalId.putIfAbsent(scrapedJob.externalId(), scrapedJob);
+            }
+        }
+        return new ArrayList<>(jobsByExternalId.values());
+    }
+
+    private static boolean isValid(ScrapedJob scrapedJob) {
+        return scrapedJob != null
+                && isPresent(scrapedJob.externalId())
+                && isPresent(scrapedJob.title())
+                && isPresent(scrapedJob.companyName())
+                && isPresent(scrapedJob.sourceUrl());
+    }
+
+    private static boolean isPresent(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static <T> Collection<T> nullSafeCollection(Collection<T> values) {
+        return values == null
+                ? List.of()
+                : values;
+    }
+
+    private static <T> List<T> nullSafeList(List<T> values) {
+        return values == null
+                ? List.of()
+                : values;
     }
 
     private static void setIfChanged(String currentValue, String newValue, Consumer<String> setter) {

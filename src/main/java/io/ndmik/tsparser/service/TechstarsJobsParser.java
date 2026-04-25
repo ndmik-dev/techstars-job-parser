@@ -1,6 +1,7 @@
 package io.ndmik.tsparser.service;
 
 import io.ndmik.tsparser.dto.ScrapedJob;
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Component;
@@ -22,9 +23,17 @@ public class TechstarsJobsParser {
     private static final String COMPANY_LINK_SELECTOR = "[itemprop=hiringOrganization] [data-testid=link]";
     private static final String LOCATION_SELECTOR = "[itemprop=addressLocality]";
     private static final String TAG_SELECTOR = "[data-testid=tag]";
+    private static final List<String> SENIORITY_TAGS = List.of(
+            "internship",
+            "entry level",
+            "associate",
+            "mid-senior level",
+            "director",
+            "executive"
+    );
 
     public List<ScrapedJob> parse(String html, String baseUrl) {
-        return parse(org.jsoup.Jsoup.parse(html, baseUrl), baseUrl);
+        return parse(Jsoup.parse(html, baseUrl), baseUrl);
     }
 
     public List<ScrapedJob> parse(Document document, String baseUrl) {
@@ -36,20 +45,23 @@ public class TechstarsJobsParser {
 
     private ScrapedJob parseCard(Element card, String baseUrl) {
         Element titleLink = card.selectFirst(JOB_TITLE_SELECTOR);
-        if (titleLink == null) {
+        Element companyLink = card.selectFirst(COMPANY_LINK_SELECTOR);
+
+        String sourceUrl = absoluteUrl(attr(titleLink, "href"), baseUrl);
+        String title = text(titleLink);
+        String companyName = text(companyLink);
+
+        if (!hasText(sourceUrl) || !hasText(title) || !hasText(companyName)) {
             return null;
         }
 
-        String sourceUrl = absoluteUrl(titleLink.attr("href"), baseUrl);
-        String title = text(titleLink);
-        String companyName = text(card.selectFirst(COMPANY_LINK_SELECTOR));
-        String companyUrl = absoluteUrl(attr(card.selectFirst(COMPANY_LINK_SELECTOR), "href"), baseUrl);
+        List<String> tags = uniqueTexts(card.select(TAG_SELECTOR).eachText());
+
+        String companyUrl = absoluteUrl(attr(companyLink, "href"), baseUrl);
         String location = attr(card.selectFirst(LOCATION_SELECTOR), "content");
         String description = attr(card.selectFirst("meta[itemprop=description]"), "content");
         String salaryText = text(card.selectFirst("[class*=ejsdCL] p"));
         String postedAtText = text(card.selectFirst(".added div"));
-        List<String> tags = uniqueTexts(card.select(TAG_SELECTOR).eachText());
-        String seniority = firstMatchingTag(tags, "internship", "entry level", "associate", "mid-senior level", "director", "executive");
 
         return new ScrapedJob(
                 externalId(sourceUrl),
@@ -60,7 +72,7 @@ public class TechstarsJobsParser {
                 description,
                 sourceUrl,
                 null,
-                seniority,
+                firstMatchingTag(tags, SENIORITY_TAGS),
                 salaryText,
                 postedAtText,
                 tags
@@ -68,7 +80,7 @@ public class TechstarsJobsParser {
     }
 
     private static String absoluteUrl(String url, String baseUrl) {
-        if (url == null || url.isBlank()) {
+        if (!hasText(url)) {
             return null;
         }
         return URI.create(baseUrl).resolve(url).toString();
@@ -83,7 +95,7 @@ public class TechstarsJobsParser {
         return sha256(sourceUrl);
     }
 
-    private static String firstMatchingTag(List<String> tags, String... values) {
+    private static String firstMatchingTag(List<String> tags, List<String> values) {
         for (String tag : tags) {
             String normalizedTag = tag.toLowerCase(Locale.ROOT);
             for (String value : values) {
@@ -122,6 +134,10 @@ public class TechstarsJobsParser {
                 : value.replace('\u00a0', ' ')
                   .trim()
                   .replaceAll("\\s+", " ");
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static String sha256(String value) {
