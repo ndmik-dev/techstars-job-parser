@@ -11,7 +11,6 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 
@@ -26,15 +25,14 @@ public class ScrapeRun {
     private Long id;
 
     @Column(name = "started_at", nullable = false)
-    @Setter(AccessLevel.NONE)
-    private Instant startedAt = Instant.now();
+    private Instant startedAt;
 
     @Column(name = "finished_at")
     private Instant finishedAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ScrapeRunStatus status = ScrapeRunStatus.RUNNING;
+    @Column(nullable = false, length = 40)
+    private ScrapeRunStatus status;
 
     @Column(name = "retrieved_count", nullable = false)
     private int retrievedCount;
@@ -52,16 +50,27 @@ public class ScrapeRun {
     private String errorMessage;
 
     public static ScrapeRun started() {
-        return new ScrapeRun();
+        return start();
     }
 
-    public void complete(int retrievedCount, int createdCount, int updatedCount, int deactivatedCount) {
+    public static ScrapeRun start() {
+        ScrapeRun scrapeRun = new ScrapeRun();
+        scrapeRun.startedAt = Instant.now();
+        scrapeRun.status = ScrapeRunStatus.RUNNING;
+        return scrapeRun;
+    }
+
+    public void complete(int retrievedCount,
+                         int createdCount,
+                         int updatedCount,
+        int deactivatedCount) {
         this.status = ScrapeRunStatus.COMPLETED;
         this.finishedAt = Instant.now();
         this.retrievedCount = retrievedCount;
         this.createdCount = createdCount;
         this.updatedCount = updatedCount;
         this.deactivatedCount = deactivatedCount;
+        this.errorMessage = null;
     }
 
     public void fail(String errorMessage) {
