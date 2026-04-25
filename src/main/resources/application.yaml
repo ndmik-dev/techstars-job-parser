@@ -12,6 +12,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  flyway:
+    enabled: true
   docker:
     compose:
       lifecycle-management: start_only
