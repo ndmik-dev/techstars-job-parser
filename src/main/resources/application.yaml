@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: techstars-job-parser
+  datasource:
+    url: jdbc:postgresql://localhost:5433/techstars_jobs
+    username: techstars_user
+    password: techstars_password
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  docker:
+    compose:
+      lifecycle-management: start_only
+
+server:
+  port: 8080

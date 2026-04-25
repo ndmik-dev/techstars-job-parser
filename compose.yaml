@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: 'postgres:18-alpine'
+    environment:
+      - 'POSTGRES_DB=techstars_jobs'
+      - 'POSTGRES_PASSWORD=techstars_password'
+      - 'POSTGRES_USER=techstars_user'
+    ports:
+      - '5433:5432'
+    volumes:
+      - 'postgres_18_data:/var/lib/postgresql'
+
+volumes:
+  postgres_18_data:
