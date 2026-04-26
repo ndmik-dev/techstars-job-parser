@@ -40,14 +40,17 @@ public final class JobSpecifications {
             return null;
         }
 
-        return (root, _, criteriaBuilder) -> {
+        return (root, query, criteriaBuilder) -> {
             Join<Job, Company> company = root.join("company", JoinType.LEFT);
+            Join<Job, Tag> tag = root.join("tags", JoinType.LEFT);
             String pattern = contains(value);
 
+            query.distinct(true);
             return criteriaBuilder.or(
                     criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), pattern),
                     criteriaBuilder.like(criteriaBuilder.lower(root.get("description")), pattern),
-                    criteriaBuilder.like(criteriaBuilder.lower(company.get("name")), pattern)
+                    criteriaBuilder.like(criteriaBuilder.lower(company.get("name")), pattern),
+                    criteriaBuilder.like(criteriaBuilder.lower(tag.get("name")), pattern)
             );
         };
     }

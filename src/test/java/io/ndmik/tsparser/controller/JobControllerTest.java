@@ -98,6 +98,14 @@ class JobControllerTest {
     }
 
     @Test
+    void querySearchesTagsToo() throws Exception {
+        mockMvc.perform(get("/api/jobs").param("q", "java"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].externalId").value("job-1"));
+    }
+
+    @Test
     void canReturnInactiveJobsWhenRequested() throws Exception {
         mockMvc.perform(get("/api/jobs").param("active", "false"))
                 .andExpect(status().isOk())
