@@ -1,164 +1,178 @@
-# Installation and Run Guide
+# Install and Verify
 
-## Requirements
+## Prerequisites
 
 - Java 25
 - Maven 3.9+
 - Docker Desktop or Docker Engine
 
-## Database
-
-The project uses PostgreSQL 18 from `compose.yaml`.
-
-Container settings:
-
-- image: `postgres:18-alpine`
-- database: `techstars_jobs`
-- user: `techstars_user`
-- password: `techstars_password`
-- host port: `5433`
-- container port: `5432`
-- volume: `postgres_18_data`
-
-Start PostgreSQL:
+## 1. Start PostgreSQL
 
 ```bash
 docker compose up -d postgres
 ```
 
-Check the mapped port:
+Verify that PostgreSQL is mapped to host port `5433`:
 
 ```bash
 docker compose ps
 ```
 
-The application expects this JDBC URL:
+Expected port mapping:
+
+```text
+0.0.0.0:5433->5432/tcp
+```
+
+Database config used by the app:
 
 ```text
 jdbc:postgresql://localhost:5433/techstars_jobs
+user: techstars_user
+password: techstars_password
 ```
 
-## Run Tests
+## 2. Run Tests
 
-Tests use H2 and do not require the PostgreSQL container.
+Tests use H2, so they do not require PostgreSQL.
 
 ```bash
 mvn test
 ```
 
-## Run Application
+Expected result:
 
-Start PostgreSQL first:
-
-```bash
-docker compose up -d postgres
+```text
+BUILD SUCCESS
 ```
 
-Run the Spring Boot app:
+## 3. Start the Application
 
 ```bash
 mvn spring-boot:run
 ```
 
-The app starts on:
+Expected startup result:
 
 ```text
-http://localhost:8080
+Tomcat started on port 8080
+Started TechstarsJobParserApplication
 ```
 
-Flyway creates the schema automatically on startup.
+Flyway creates the database schema automatically.
 
-## Trigger Scraping
+## 4. Verify Basic API
 
-Manual scrape:
+In another terminal:
+
+```bash
+curl "http://localhost:8080/api/jobs"
+```
+
+Expected result before scraping:
+
+```json
+{"content":[],"page":0,"size":20,"totalElements":0,"totalPages":0,"first":true,"last":true}
+```
+
+Verify Swagger:
+
+```bash
+curl -I "http://localhost:8080/swagger-ui.html"
+```
+
+Expected result:
+
+```text
+HTTP/1.1 200
+```
+
+## 5. Run Scraper
 
 ```bash
 curl -X POST "http://localhost:8080/api/scrape-runs"
 ```
 
-Scrape history:
+Expected result:
+
+HTTP `201` with `"status":"COMPLETED"` and positive `retrievedCount`.
+
+Exact counts can change if Techstars changes the page.
+
+## 6. Verify Scraped Data
+
+```bash
+curl "http://localhost:8080/api/jobs?size=3"
+```
+
+Expected result:
+
+- HTTP `200`
+- non-empty `content`
+- `totalElements` greater than `0`
+
+Check filters:
+
+```bash
+curl "http://localhost:8080/api/jobs?q=software"
+curl "http://localhost:8080/api/jobs?location=United"
+curl "http://localhost:8080/api/jobs?tag=Software"
+curl "http://localhost:8080/api/companies"
+curl "http://localhost:8080/api/tags"
+```
+
+Check scrape history:
 
 ```bash
 curl "http://localhost:8080/api/scrape-runs"
 ```
 
-## Query Jobs
+Expected result:
+
+- at least one run
+- latest run has `status: COMPLETED`
+
+## 7. Create Fresh Dump
+
+After a successful scrape:
 
 ```bash
-curl "http://localhost:8080/api/jobs?page=0&size=20"
-curl "http://localhost:8080/api/jobs?q=java"
-curl "http://localhost:8080/api/jobs?location=remote"
-curl "http://localhost:8080/api/jobs?company=techstars"
-curl "http://localhost:8080/api/jobs?tag=spring"
-curl "http://localhost:8080/api/jobs?active=false"
+docker compose exec -T postgres pg_dump -U techstars_user techstars_jobs > techstars_jobs_dump.sql
 ```
 
-Reference data:
-
-```bash
-curl "http://localhost:8080/api/companies"
-curl "http://localhost:8080/api/tags"
-```
-
-## Swagger
-
-OpenAPI JSON:
-
-```text
-http://localhost:8080/v3/api-docs
-```
-
-Swagger UI:
-
-```text
-http://localhost:8080/swagger-ui.html
-```
-
-## Scheduled Scraping
-
-Scheduled scraping is disabled by default:
-
-```yaml
-techstars:
-  scraper:
-    scheduling-enabled: false
-    cron: "0 0 */6 * * *"
-```
-
-To enable it, set:
-
-```yaml
-techstars:
-  scraper:
-    scheduling-enabled: true
-```
-
-Default cron runs every 6 hours.
-
-## Database Dump
-
-After running at least one scrape, create a dump with:
-
-```bash
-docker compose exec postgres pg_dump -U techstars_user techstars_jobs > techstars_jobs_dump.sql
-```
-
-Restore example:
+Restore dump:
 
 ```bash
 docker compose exec -T postgres psql -U techstars_user techstars_jobs < techstars_jobs_dump.sql
 ```
 
-## Stop Services
+## 8. Stop Services
 
-Stop the database container:
+Stop only containers:
 
 ```bash
 docker compose down
 ```
 
-Stop and remove the PostgreSQL volume:
+Stop containers and remove database volume:
 
 ```bash
 docker compose down -v
+```
+
+## Optional: Scheduled Scraping
+
+Scheduled scraping is disabled by default:
+
+```yaml
+techstars.scraper.scheduling-enabled: false
+```
+
+Enable it in `application.yaml`:
+
+```yaml
+techstars:
+  scraper:
+    scheduling-enabled: true
+    cron: "0 0 */6 * * *"
 ```

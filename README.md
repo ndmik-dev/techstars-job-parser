@@ -1,57 +1,33 @@
 # Techstars Job Parser
 
-Spring Boot application that scrapes job listings from `https://jobs.techstars.com/jobs`, stores them in PostgreSQL, and exposes REST endpoints for querying jobs, filters, and scrape run history.
+Spring Boot service that scrapes jobs from `https://jobs.techstars.com/jobs`, stores them in PostgreSQL, and exposes a REST API for jobs, filters, and scrape history.
 
-## Features
+## What Is Implemented
 
-- Scrapes Techstars job cards with Jsoup.
-- Stores companies, jobs, tags, and scrape run statistics in SQL via Spring Data JPA.
-- Uses Flyway for database schema creation.
-- Synchronizes repeated scrapes:
-  - creates new jobs;
-  - updates existing jobs;
-  - skips invalid or duplicate scraped records;
-  - marks missing jobs as inactive.
-- Provides paginated and filterable job API.
-- Provides reference endpoints for companies and tags.
-- Provides manual and scheduled scraping.
-- Exposes Swagger/OpenAPI documentation.
+- Maven-based Spring Boot 4 application.
+- PostgreSQL 18 storage with Flyway migrations.
+- Jsoup-based Techstars scraper.
+- Job synchronization: create, update, skip duplicates, mark missing jobs inactive.
+- REST API with pagination and filters.
+- Manual and optional scheduled scraping.
+- Swagger/OpenAPI.
+- SQL dump with sample scraped data: `techstars_jobs_dump.sql`.
 
-## Main Endpoints
+## Main API
 
-- `GET /api/jobs` - paginated jobs list.
-- `GET /api/jobs/{id}` - job details.
-- `GET /api/companies` - companies sorted by name.
-- `GET /api/tags` - tags sorted by name.
-- `POST /api/scrape-runs` - run scraping manually.
-- `GET /api/scrape-runs` - scrape run history.
-- `GET /v3/api-docs` - OpenAPI JSON.
-- `GET /swagger-ui.html` - Swagger UI.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/jobs` | Paginated jobs with filters |
+| `GET` | `/api/jobs/{id}` | Job details |
+| `GET` | `/api/companies` | Company filter values |
+| `GET` | `/api/tags` | Tag filter values |
+| `POST` | `/api/scrape-runs` | Run scraper manually |
+| `GET` | `/api/scrape-runs` | Scrape history |
+| `GET` | `/swagger-ui.html` | Swagger UI |
 
-## Example Requests
+## Useful Docs
 
-```bash
-curl "http://localhost:8080/api/jobs?page=0&size=20"
-curl "http://localhost:8080/api/jobs?q=java&location=remote&tag=spring"
-curl "http://localhost:8080/api/jobs?active=false"
-curl "http://localhost:8080/api/companies"
-curl "http://localhost:8080/api/tags"
-curl -X POST "http://localhost:8080/api/scrape-runs"
-curl "http://localhost:8080/api/scrape-runs"
-```
-
-## Tech Stack
-
-- Java 25
-- Spring Boot 4
-- Maven
-- Spring Web MVC
-- Spring Data JPA
-- Flyway
-- PostgreSQL 18
-- Jsoup
-- Lombok
-- Springdoc OpenAPI
-- H2 for tests
-
-See [INSTALL.md](INSTALL.md) for local setup and run instructions.
+- [INSTALL.md](INSTALL.md) - step-by-step launch and verification.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - architecture overview.
+- [docs/CODE_WALKTHROUGH.md](docs/CODE_WALKTHROUGH.md) - code structure guide.
+- [docs/FLOWS_AND_API.md](docs/FLOWS_AND_API.md) - runtime flows and API examples.
