@@ -31,3 +31,7 @@ Spring Boot service that scrapes jobs from `https://jobs.techstars.com/jobs`, st
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - architecture overview.
 - [docs/CODE_WALKTHROUGH.md](docs/CODE_WALKTHROUGH.md) - code structure guide.
 - [docs/FLOWS_AND_API.md](docs/FLOWS_AND_API.md) - runtime flows and API examples.
+
+## License
+
+Technical review only. See [LICENSE](LICENSE).
