@@ -13,16 +13,13 @@ import io.ndmik.tsparser.repository.TagRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-import java.util.function.Consumer;
 
 @Service
 public class JobSyncService {
@@ -89,26 +86,25 @@ public class JobSyncService {
     }
 
     private Job findOrCreateJob(ScrapedJob scrapedJob, Company company, SyncCounters counters) {
-        return jobRepository.findByExternalId(scrapedJob.externalId())
-                .map(existingJob -> {
-                    counters.updated++;
-                    return existingJob;
-                })
-                .orElseGet(() -> {
-                    counters.created++;
-                    return new Job(
-                            scrapedJob.externalId(),
-                            scrapedJob.title(),
-                            scrapedJob.sourceUrl(),
-                            company
-                    );
-                });
+        Job job = jobRepository.findByExternalId(scrapedJob.externalId()).orElse(null);
+        if (job == null) {
+            counters.created++;
+            return new Job(
+                    scrapedJob.externalId(),
+                    scrapedJob.title(),
+                    scrapedJob.sourceUrl(),
+                    company
+            );
+        }
+
+        counters.updated++;
+        return job;
     }
 
     private Company resolveCompany(ScrapedJob scrapedJob) {
         return companyRepository.findByNameIgnoreCase(scrapedJob.companyName())
                 .map(company -> {
-                    setIfChanged(company.getSourceUrl(), scrapedJob.companyUrl(), company::setSourceUrl);
+                    company.updateSourceUrl(scrapedJob.companyUrl());
                     return company;
                 })
                 .orElseGet(() -> companyRepository.save(new Company(scrapedJob.companyName(), scrapedJob.companyUrl())));
@@ -116,10 +112,7 @@ public class JobSyncService {
 
     private Set<Tag> resolveTags(List<String> tagNames) {
         Set<Tag> tags = new HashSet<>();
-        for (String tagName : nullSafeList(tagNames)) {
-            if (tagName == null || tagName.isBlank()) {
-                continue;
-            }
+        for (String tagName : tagNames) {
             tags.add(tagRepository.findByNameIgnoreCase(tagName)
                     .orElseGet(() -> tagRepository.save(new Tag(tagName))));
         }
@@ -127,17 +120,17 @@ public class JobSyncService {
     }
 
     private void applyScrapedData(Job job, ScrapedJob scrapedJob, Company company, Set<Tag> tags) {
-        setIfChanged(job.getTitle(), scrapedJob.title(), job::setTitle);
-        setIfChanged(job.getLocation(), scrapedJob.location(), job::setLocation);
-        setIfChanged(job.getDescription(), scrapedJob.description(), job::setDescription);
-        setIfChanged(job.getSourceUrl(), scrapedJob.sourceUrl(), job::setSourceUrl);
-        setIfChanged(job.getRemoteType(), scrapedJob.remoteType(), job::setRemoteType);
-        setIfChanged(job.getSeniority(), scrapedJob.seniority(), job::setSeniority);
-        setIfChanged(job.getSalaryText(), scrapedJob.salaryText(), job::setSalaryText);
-        setIfChanged(job.getPostedAtText(), scrapedJob.postedAtText(), job::setPostedAtText);
-        job.setCompany(company);
-        job.setActive(true);
-        job.setLastSeenAt(Instant.now());
+        job.updateDetails(
+                scrapedJob.title(),
+                scrapedJob.location(),
+                scrapedJob.description(),
+                scrapedJob.sourceUrl(),
+                scrapedJob.remoteType(),
+                scrapedJob.seniority(),
+                scrapedJob.salaryText(),
+                scrapedJob.postedAtText(),
+                company
+        );
         job.replaceTags(tags);
     }
 
@@ -148,7 +141,7 @@ public class JobSyncService {
 
         List<Job> missingJobs = jobRepository.findByActiveTrueAndExternalIdNotIn(seenExternalIds);
         for (Job missingJob : missingJobs) {
-            missingJob.setActive(false);
+            missingJob.deactivate();
         }
         jobRepository.saveAll(missingJobs);
         return missingJobs.size();
@@ -163,7 +156,7 @@ public class JobSyncService {
 
     private static List<ScrapedJob> validUniqueJobs(Collection<ScrapedJob> scrapedJobs) {
         Map<String, ScrapedJob> jobsByExternalId = new LinkedHashMap<>();
-        for (ScrapedJob scrapedJob : nullSafeCollection(scrapedJobs)) {
+        for (ScrapedJob scrapedJob : scrapedJobs) {
             if (isValid(scrapedJob)) {
                 jobsByExternalId.putIfAbsent(scrapedJob.externalId(), scrapedJob);
             }
@@ -172,8 +165,7 @@ public class JobSyncService {
     }
 
     private static boolean isValid(ScrapedJob scrapedJob) {
-        return scrapedJob != null
-                && isPresent(scrapedJob.externalId())
+        return isPresent(scrapedJob.externalId())
                 && isPresent(scrapedJob.title())
                 && isPresent(scrapedJob.companyName())
                 && isPresent(scrapedJob.sourceUrl());
@@ -181,24 +173,6 @@ public class JobSyncService {
 
     private static boolean isPresent(String value) {
         return value != null && !value.isBlank();
-    }
-
-    private static <T> Collection<T> nullSafeCollection(Collection<T> values) {
-        return values == null
-                ? List.of()
-                : values;
-    }
-
-    private static <T> List<T> nullSafeList(List<T> values) {
-        return values == null
-                ? List.of()
-                : values;
-    }
-
-    private static void setIfChanged(String currentValue, String newValue, Consumer<String> setter) {
-        if (!Objects.equals(currentValue, newValue)) {
-            setter.accept(newValue);
-        }
     }
 
     private static final class SyncCounters {

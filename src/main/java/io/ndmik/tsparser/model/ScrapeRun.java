@@ -50,10 +50,6 @@ public class ScrapeRun {
     private String errorMessage;
 
     public static ScrapeRun started() {
-        return start();
-    }
-
-    public static ScrapeRun start() {
         ScrapeRun scrapeRun = new ScrapeRun();
         scrapeRun.startedAt = Instant.now();
         scrapeRun.status = ScrapeRunStatus.RUNNING;

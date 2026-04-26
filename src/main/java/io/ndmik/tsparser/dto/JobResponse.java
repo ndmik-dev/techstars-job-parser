@@ -1,6 +1,7 @@
 package io.ndmik.tsparser.dto;
 
 import io.ndmik.tsparser.model.Job;
+import io.ndmik.tsparser.model.Tag;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -43,7 +44,7 @@ public record JobResponse(
                 job.getFirstSeenAt(),
                 job.getLastSeenAt(),
                 job.getTags().stream()
-                        .map(tag -> tag.getName())
+                        .map(Tag::getName)
                         .sorted(Comparator.naturalOrder())
                         .toList()
         );

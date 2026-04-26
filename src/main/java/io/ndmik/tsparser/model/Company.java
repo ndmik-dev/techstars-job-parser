@@ -11,7 +11,6 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 
@@ -28,7 +27,6 @@ public class Company {
     @Column(nullable = false, unique = true)
     private String name;
 
-    @Setter
     @Column(name = "source_url", length = 2048)
     private String sourceUrl;
 

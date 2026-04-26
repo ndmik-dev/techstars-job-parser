@@ -69,7 +69,7 @@ public final class JobSpecifications {
             return null;
         }
 
-        return (root, query, criteriaBuilder) -> {
+        return (root, _, criteriaBuilder) -> {
             Join<Job, Company> company = root.join("company", JoinType.LEFT);
             return criteriaBuilder.like(criteriaBuilder.lower(company.get("name")), contains(value));
         };
@@ -92,7 +92,7 @@ public final class JobSpecifications {
             return null;
         }
 
-        return (root, query, criteriaBuilder) ->
+        return (root, _, criteriaBuilder) ->
                 criteriaBuilder.like(criteriaBuilder.lower(root.get(field)), contains(value));
     }
 

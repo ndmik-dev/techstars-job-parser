@@ -16,7 +16,6 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -35,43 +34,33 @@ public class Job {
     @Column(name = "external_id", nullable = false, unique = true)
     private String externalId;
 
-    @Setter
     @Column(nullable = false, length = 500)
     private String title;
 
-    @Setter
     @Column(length = 500)
     private String location;
 
-    @Setter
     @Column(columnDefinition = "text")
     private String description;
 
-    @Setter
     @Column(name = "source_url", nullable = false, unique = true, length = 2048)
     private String sourceUrl;
 
-    @Setter
     @Column(name = "remote_type", length = 120)
     private String remoteType;
 
-    @Setter
     @Column(length = 120)
     private String seniority;
 
-    @Setter
     @Column(name = "salary_text")
     private String salaryText;
 
-    @Setter
     @Column(name = "posted_at_text")
     private String postedAtText;
 
-    @Setter
     @Column(nullable = false)
     private boolean active = true;
 
-    @Setter
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
@@ -87,7 +76,6 @@ public class Job {
     @Column(name = "first_seen_at", nullable = false)
     private Instant firstSeenAt;
 
-    @Setter
     @Column(name = "last_seen_at", nullable = false)
     private Instant lastSeenAt;
 

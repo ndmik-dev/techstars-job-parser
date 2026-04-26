@@ -17,9 +17,5 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
     @EntityGraph(attributePaths = {"company", "tags"})
     Optional<Job> findWithCompanyAndTagsById(Long id);
 
-    List<Job> findByExternalIdIn(Collection<String> externalIds);
-
-    List<Job> findByActiveTrue();
-
     List<Job> findByActiveTrueAndExternalIdNotIn(Collection<String> externalIds);
 }

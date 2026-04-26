@@ -32,8 +32,4 @@ public class ScrapeService {
             running.set(false);
         }
     }
-
-    public boolean isRunning() {
-        return running.get();
-    }
 }

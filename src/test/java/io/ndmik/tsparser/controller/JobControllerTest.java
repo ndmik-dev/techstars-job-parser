@@ -59,13 +59,19 @@ class JobControllerTest {
         Tag spring = tagRepository.save(new Tag("Spring"));
         Tag react = tagRepository.save(new Tag("React"));
 
-        Job backendJob = job("job-1", "Backend Engineer", "Remote", acme, Set.of(java, spring));
-        backendJob.setSeniority("Mid-Senior Level");
-        backendJob.setRemoteType("remote");
+        Job backendJob = job(
+                "job-1",
+                "Backend Engineer",
+                "Remote",
+                "remote",
+                "Mid-Senior Level",
+                acme,
+                Set.of(java, spring)
+        );
         backendJobId = jobRepository.save(backendJob).getId();
 
-        Job frontendJob = job("job-2", "Frontend Engineer", "London", beta, Set.of(react));
-        frontendJob.setActive(false);
+        Job frontendJob = job("job-2", "Frontend Engineer", "London", null, null, beta, Set.of(react));
+        frontendJob.deactivate();
         jobRepository.save(frontendJob);
     }
 
@@ -118,11 +124,23 @@ class JobControllerTest {
     private static Job job(String externalId,
                            String title,
                            String location,
+                           String remoteType,
+                           String seniority,
                            Company company,
                            Set<Tag> tags) {
-        Job job = new Job(externalId, title, "https://jobs.techstars.com/jobs/" + externalId, company);
-        job.setLocation(location);
-        job.setDescription(title + " at " + company.getName());
+        String sourceUrl = "https://jobs.techstars.com/jobs/" + externalId;
+        Job job = new Job(externalId, title, sourceUrl, company);
+        job.updateDetails(
+                title,
+                location,
+                title + " at " + company.getName(),
+                sourceUrl,
+                remoteType,
+                seniority,
+                null,
+                null,
+                company
+        );
         job.replaceTags(tags);
         return job;
     }
